@@ -1,0 +1,12 @@
+## Build and output directories
+bin/
+obj/
+
+## User-specific files
+*.user
+*.userosscache
+*.sln.docstates
+*.pfx
+
+## Visual Studio cache
+.vs/

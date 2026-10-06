@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <AssemblyTitle>Transparent Notepad</AssemblyTitle>
+    <AssemblyDescription>A stealthy, transparent note-taking application designed for privacy during screen sharing.</AssemblyDescription>
+    <Company>DebjeetDas</Company>
+    <Product>Transparent Notepad</Product>
+    <Copyright>Copyright © 2026 DebjeetDas</Copyright>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
+    <Authors>Debjeet</Authors>
+  </PropertyGroup>
+</Project>
