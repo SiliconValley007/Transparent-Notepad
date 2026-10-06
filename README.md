@@ -32,7 +32,8 @@ dotnet add package Microsoft.Web.WebView2
 
 **Configuration file location**(this is where opacity is persisted)
 C:\Users\<YourUsername>\AppData\Local\TransparentNotepad\config.json
-A
+
+
 **Unhandled exception logging** (this is where unhandled errors are logged{same directory where opacity is persisted})
 %LOCALAPPDATA%\TransparentNotepad\error_log.txt
 
