@@ -3,7 +3,8 @@ namespace TransparentNotepad;
 static class Program
 {
     private static readonly string LogFilePath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, 
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "TransparentNotepad",
         "error_log.txt"
     );
 
