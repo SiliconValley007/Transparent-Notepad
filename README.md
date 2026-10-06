@@ -39,5 +39,5 @@ A
 | Ctrl + Shift + S | Save file as... |
 | Ctrl + Up | Increase window opacity |
 | Ctrl + Down | Decrease window opacity |
-| Ctrl + Shift + H | Global hotkey to minimize/restore window |
-| Esc | Quick hide / minimize window |
+| Ctrl + Shift + H | Global hotkey to hide/restore window |
+| Esc | Quick hide window |

@@ -17,7 +17,7 @@ static class Program
         // UI Thread Exception Handler
         Application.ThreadException += (sender, e) =>
         {
-            LogException("UI Thread Exception", e.Exception);
+            LogAndShowException(e.Exception);
             ShowErrorMessage("An unexpected interface error occurred.");
         };
 
@@ -26,7 +26,7 @@ static class Program
         {
             if (e.ExceptionObject is Exception ex)
             {
-                LogException("AppDomain Unhandled Exception", ex);
+                LogAndShowException(ex);
             }
             ShowErrorMessage("A critical background error occurred.");
         };
@@ -35,17 +35,26 @@ static class Program
         Application.Run(new MainForm());
     }
 
-    private static void LogException(string source, Exception ex)
+    private static void LogAndShowException(Exception ex)
     {
         try
         {
-            string logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{source}] {ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}{new string('-', 50)}{Environment.NewLine}";
-            File.AppendAllText(LogFilePath, logMessage);
+            string logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TransparentNotepad"
+            );
+            Directory.CreateDirectory(logDir);
+            string logFile = Path.Combine(logDir, "error_log.txt");
+            File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}\n\n");
         }
-        catch
-        {
-            // Fallback if logging fails
-        }
+        catch { }
+
+        MessageBox.Show(
+            $"An unexpected error occurred:\n{ex.Message}\n\nDetails logged to local application data.",
+            "Transparent Notepad Error",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error
+        );
     }
 
     private static void ShowErrorMessage(string message)

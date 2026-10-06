@@ -1,12 +1,17 @@
-## Build and output directories
+# Build output directories
 bin/
 obj/
 
-## User-specific files
+# Visual Studio & IDE cache
+.vs/
 *.user
+*.suo
 *.userosscache
 *.sln.docstates
-*.pfx
 
-## Visual Studio cache
-.vs/
+# Executables & Logs
+*.exe
+*.dll
+*.pdb
+*.pfx
+error_log.txt

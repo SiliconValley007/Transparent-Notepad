@@ -7,12 +7,11 @@ namespace TransparentNotepad
 {
     public class AppConfig
     {
-        public double Opacity { get; set; } = 1.0; // Default 100% opacity
+        public double Opacity { get; set; } = 1.0;
     }
 
     public partial class MainForm : Form
     {
-        // Settings Persistence File Path (%LOCALAPPDATA%\TransparentNotepad\config.json)
         private static readonly string ConfigDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
             "TransparentNotepad"
@@ -21,17 +20,15 @@ namespace TransparentNotepad
 
         private AppConfig appConfig = new AppConfig();
 
-        // --- Win32 Display Affinity API ---
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
 
         private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
-        // --- Win32 Global Hotkey API ---
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         private const int HOTKEY_ID = 9000;
@@ -40,7 +37,6 @@ namespace TransparentNotepad
         private const uint VK_H = 0x48;
         private const int WM_HOTKEY = 0x0312;
 
-        // UI Controls
         private MenuStrip mainMenuStrip = null!;
         private ToolStripMenuItem fileMenu = null!;
         private ToolStripMenuItem opacityMenu = null!;
@@ -48,15 +44,27 @@ namespace TransparentNotepad
         private ToastLabel toastOverlay = null!;
         private System.Windows.Forms.Timer toastTimer = null!;
 
-        // State Tracking
         private string? currentFilePath = null;
         private bool isModified = false;
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= 0x80; // WS_EX_TOOLWINDOW: Hides completely from Alt+Tab
+                return cp;
+            }
+        }
 
         public MainForm()
         {
             LoadConfig();
             InitializeComponent();
+            this.ShowInTaskbar = false;
+            this.FormBorderStyle = FormBorderStyle.SizableToolWindow;
             this.KeyPreview = true;
+
             var assembly = Assembly.GetExecutingAssembly();
             using var stream = assembly.GetManifestResourceStream("TransparentNotepad.notepad.ico");
             if (stream != null)
@@ -107,10 +115,8 @@ namespace TransparentNotepad
 
             this.SuspendLayout();
 
-            // 1. Configure Light Menu Strip
             BuildMenus();
 
-            // 2. Main Text Editor Setup
             this.notepadTextBox.Dock = DockStyle.Fill;
             this.notepadTextBox.BorderStyle = BorderStyle.None;
             this.notepadTextBox.BackColor = Color.White;
@@ -124,7 +130,6 @@ namespace TransparentNotepad
             this.notepadTextBox.DragEnter += NotepadTextBox_DragEnter;
             this.notepadTextBox.DragDrop += NotepadTextBox_DragDrop;
 
-            // 3. Floating Toast Notification HUD
             this.toastOverlay.AutoSize = true;
             this.toastOverlay.BackColor = Color.FromArgb(220, 230, 230, 230);
             this.toastOverlay.ForeColor = Color.Black;
@@ -139,7 +144,6 @@ namespace TransparentNotepad
                 this.toastTimer.Stop();
             };
 
-            // 4. Attach Controls to Form
             this.Controls.Add(this.toastOverlay);
             this.Controls.Add(this.notepadTextBox);
             this.Controls.Add(this.mainMenuStrip);
@@ -147,7 +151,6 @@ namespace TransparentNotepad
 
             this.notepadTextBox.Resize += (s, e) => PositionToastHUD();
 
-            // 5. Form Appearance Settings
             this.Opacity = Math.Clamp(appConfig.Opacity, 0.15, 1.0);
             this.ClientSize = new Size(820, 520);
             this.Text = "Transparent Notepad - Untitled";
@@ -348,7 +351,17 @@ namespace TransparentNotepad
         {
             base.OnHandleCreated(e);
             SetWindowDisplayAffinity(this.Handle, WDA_EXCLUDEFROMCAPTURE);
-            RegisterHotKey(this.Handle, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_H);
+
+            bool success = RegisterHotKey(this.Handle, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_H);
+            if (!success)
+            {
+                MessageBox.Show(
+                    "Failed to register global hotkey (Ctrl + Shift + H). Another application might be using it.",
+                    "Hotkey Warning",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -427,7 +440,7 @@ namespace TransparentNotepad
 
         private void ToggleWindowVisibility()
         {
-            if (this.WindowState == FormWindowState.Minimized || !this.Visible)
+            if (!this.Visible)
             {
                 this.Show();
                 this.WindowState = FormWindowState.Normal;
@@ -435,7 +448,7 @@ namespace TransparentNotepad
             }
             else
             {
-                this.WindowState = FormWindowState.Minimized;
+                this.Hide();
             }
         }
     }
