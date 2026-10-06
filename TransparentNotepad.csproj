@@ -10,6 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
 
+	  <ApplicationManifest>app.manifest</ApplicationManifest>
+
     <NoWarn>MSB3277</NoWarn>
 
     <ApplicationIcon>notepad.ico</ApplicationIcon>
@@ -24,14 +26,20 @@
     <Version>1.0.0</Version>
     <Authors>Debjeet</Authors>
 
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
     <!-- Single File & Native DLL Fix -->
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 
     <!-- Smallest EXE Size (Requires .NET Desktop Runtime on host PC) -->
     <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
+
+    <RepositoryUrl>https://github.com/siliconvalley007/TransparentNotepad</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>

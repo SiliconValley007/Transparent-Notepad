@@ -1,69 +1,73 @@
-namespace TransparentNotepad;
+using System;
+using System.IO;
+using System.Threading;
+using System.Windows.Forms;
 
-static class Program
+namespace TransparentNotepad
 {
-    private static readonly string LogFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "TransparentNotepad",
-        "error_log.txt"
-    );
-
-    [STAThread]
-    static void Main()
+    static class Program
     {
-        // Set unhandled exception mode for WinForms controls
-        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        private static readonly string LogDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "TransparentNotepad"
+        );
 
-        // UI Thread Exception Handler
-        Application.ThreadException += (sender, e) =>
-        {
-            LogAndShowException(e.Exception);
-            ShowErrorMessage("An unexpected interface error occurred.");
-        };
+        private static readonly string LogFilePath = Path.Combine(LogDirectory, "error_log.txt");
 
-        // Non-UI / Background Thread Exception Handler
-        AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+        [STAThread]
+        static void Main()
         {
-            if (e.ExceptionObject is Exception ex)
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            // 1. Set exception mode for WinForms controls
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+
+            // 2. UI Thread Exception Handler
+            Application.ThreadException += (sender, e) =>
             {
-                LogAndShowException(ex);
-            }
-            ShowErrorMessage("A critical background error occurred.");
-        };
+                LogAndShowException(e.Exception, "An unexpected interface error occurred.");
+            };
 
-        ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
-    }
+            // 3. Non-UI / Background Thread Exception Handler
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                if (e.ExceptionObject is Exception ex)
+                {
+                    LogAndShowException(ex, "A fatal background error occurred.");
+                }
+            };
 
-    private static void LogAndShowException(Exception ex)
-    {
-        try
-        {
-            string logDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "TransparentNotepad"
-            );
-            Directory.CreateDirectory(logDir);
-            string logFile = Path.Combine(logDir, "error_log.txt");
-            File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}\n\n");
+            Application.Run(new MainForm());
         }
-        catch { }
 
-        MessageBox.Show(
-            $"An unexpected error occurred:\n{ex.Message}\n\nDetails logged to local application data.",
-            "Transparent Notepad Error",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Error
-        );
-    }
+        private static void LogAndShowException(Exception ex, string userMessage)
+        {
+            try
+            {
+                // Ensure directory exists
+                if (!Directory.Exists(LogDirectory))
+                {
+                    Directory.CreateDirectory(LogDirectory);
+                }
 
-    private static void ShowErrorMessage(string message)
-    {
-        MessageBox.Show(
-            $"{message}\nDetails have been logged to error_log.txt.",
-            "Transparent Notepad Error",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Error
-        );
+                // Append error details to log file
+                string logContent = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}\n" +
+                                   $"--------------------------------------------------\n";
+                File.AppendAllText(LogFilePath, logContent);
+            }
+            catch
+            {
+                // Fail silently if writing to log fails
+            }
+
+            // Show friendly message to user instead of crashing silently
+            MessageBox.Show(
+                $"{userMessage}\n\nError Details: {ex.Message}\n\nLog saved to:\n{LogFilePath}",
+                "Transparent Notepad Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+        }
     }
 }

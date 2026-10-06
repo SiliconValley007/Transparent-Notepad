@@ -323,14 +323,23 @@ namespace TransparentNotepad
                     tabWebView.CoreWebView2.Stop();
                 }
 
-                tabWebView.Dispose();
                 browserTabControl.TabPages.Remove(newTabPage);
+                tabWebView.Dispose();
 
                 if (browserTabControl.TabPages.Count == 1)
                 {
                     AddNewBrowserTab("https://www.google.com");
                 }
             };
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // Clean up any custom Disposable objects here if needed
+            }
+            base.Dispose(disposing);
         }
 
         private async void InitTabWebView(WebView2 targetWebView, TextBox txtUrl, TabPage tab, string initialUrl)
