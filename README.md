@@ -21,7 +21,7 @@ A lightweight, high-contrast C# Windows Forms application that leverages the Win
 ```bash
 dotnet build
 dotnet run
-dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+dotnet publish -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
 ### To install WebView

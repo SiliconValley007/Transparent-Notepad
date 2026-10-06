@@ -1,11 +1,8 @@
-using System;
-using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.IO;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -241,10 +238,40 @@ namespace TransparentNotepad
                 webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
                 AddNewBrowserTab("https://www.google.com");
             }
+            catch (DllNotFoundException)
+            {
+                // Occurs if WebView2Loader.dll wasn't bundled into the EXE
+                MessageBox.Show(
+                    "Application error: 'WebView2Loader.dll' is missing. Build/publish with native libraries embedded.",
+                    "Browser Initialization Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                DisableBrowserUI();
+            }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to initialize WebView2 Environment:\n{ex.Message}", "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Occurs if Microsoft Edge WebView2 Runtime is missing on the machine
+                var result = MessageBox.Show(
+                    $"Browser feature couldn't start because WebView2 Runtime is missing.\n\nWould you like to download and install it now?\n\nError Details:\n{ex.Message}",
+                    "Missing Dependency",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    Process.Start(new ProcessStartInfo("https://go.microsoft.com/fwlink/p/?LinkId=2124703") { UseShellExecute = true });
+                }
+
+                DisableBrowserUI();
             }
+        }
+
+        private void DisableBrowserUI()
+        {
+            // Graceful fallback: Hide or disable browser controls so notepad still works cleanly
+            // tabControl.Visible = false; // Example
         }
 
         private void AddNewBrowserTab(string url = "https://www.google.com")
@@ -328,7 +355,18 @@ namespace TransparentNotepad
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to load tab:\n{ex.Message}", "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // MessageBox.Show($"Failed to load tab:\n{ex.Message}", "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                var result = MessageBox.Show(
+                    $"Microsoft Edge WebView2 Runtime is missing:\n{ex.Message}. Would you like to download it now?",
+                    "Missing Dependency",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Error
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    Process.Start(new ProcessStartInfo("https://go.microsoft.com/fwlink/p/?LinkId=2124703") { UseShellExecute = true });
+                }
             }
         }
 
