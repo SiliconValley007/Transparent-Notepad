@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
 
+    <NoWarn>MSB3277</NoWarn>
+
     <ApplicationIcon>notepad.ico</ApplicationIcon>
 
     <AssemblyTitle>Transparent Notepad</AssemblyTitle>
@@ -22,5 +24,9 @@
 
   <ItemGroup>
     <EmbeddedResource Include="notepad.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
   </ItemGroup>
 </Project>

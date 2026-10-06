@@ -1,25 +1,34 @@
+using System;
+using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Reflection;
+using System.Windows.Forms;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 
 namespace TransparentNotepad
 {
     public class AppConfig
     {
-        public double Opacity { get; set; } = 1.0;
+        public double Opacity { get; set; } = 0.85;
+        public bool AlwaysOnTop { get; set; } = false;
     }
 
     public partial class MainForm : Form
     {
         private static readonly string ConfigDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "TransparentNotepad"
         );
         private static readonly string ConfigPath = Path.Combine(ConfigDir, "config.json");
+        private static readonly string AutoSavePath = Path.Combine(ConfigDir, "autosave_draft.txt");
 
         private AppConfig appConfig = new AppConfig();
 
+        // Win32 Interop
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
 
@@ -37,12 +46,28 @@ namespace TransparentNotepad
         private const uint VK_H = 0x48;
         private const int WM_HOTKEY = 0x0312;
 
+        // Core App Tabs
+        private TabControl mainTabControl = null!;
+        private TabPage tabNotepad = null!;
+        private TabPage tabBrowser = null!;
+
+        // Notepad Controls
         private MenuStrip mainMenuStrip = null!;
         private ToolStripMenuItem fileMenu = null!;
+        private ToolStripMenuItem viewMenu = null!;
         private ToolStripMenuItem opacityMenu = null!;
+        private ToolStripMenuItem alwaysOnTopMenuItem = null!;
         private RichTextBox notepadTextBox = null!;
+
+        // Browser Tab Management Controls
+        private TabControl browserTabControl = null!;
+        private TabPage addTabButtonPage = null!;
+        private CoreWebView2Environment? webViewEnvironment;
+
+        // UI Helpers
         private ToastLabel toastOverlay = null!;
         private System.Windows.Forms.Timer toastTimer = null!;
+        private System.Windows.Forms.Timer autoSaveTimer = null!;
 
         private string? currentFilePath = null;
         private bool isModified = false;
@@ -52,7 +77,7 @@ namespace TransparentNotepad
             get
             {
                 CreateParams cp = base.CreateParams;
-                cp.ExStyle |= 0x80; // WS_EX_TOOLWINDOW: Hides completely from Alt+Tab
+                cp.ExStyle |= 0x80; // WS_EX_TOOLWINDOW: Hides from Alt+Tab
                 return cp;
             }
         }
@@ -61,6 +86,7 @@ namespace TransparentNotepad
         {
             LoadConfig();
             InitializeComponent();
+
             this.ShowInTaskbar = false;
             this.FormBorderStyle = FormBorderStyle.SizableToolWindow;
             this.KeyPreview = true;
@@ -71,6 +97,9 @@ namespace TransparentNotepad
             {
                 this.Icon = new Icon(stream);
             }
+
+            LoadAutoSaveDraft();
+            InitializeBrowserEnvironmentAsync();
         }
 
         private void LoadConfig()
@@ -106,15 +135,28 @@ namespace TransparentNotepad
 
         private void InitializeComponent()
         {
+            this.mainTabControl = new TabControl { Dock = DockStyle.Fill };
+            this.tabNotepad = new TabPage("Notepad");
+            this.tabBrowser = new TabPage("Browser");
+
             this.notepadTextBox = new RichTextBox();
             this.mainMenuStrip = new MenuStrip();
             this.fileMenu = new ToolStripMenuItem("&File");
+            this.viewMenu = new ToolStripMenuItem("&View");
             this.opacityMenu = new ToolStripMenuItem("&Opacity");
+
             this.toastOverlay = new ToastLabel();
             this.toastTimer = new System.Windows.Forms.Timer();
+            this.autoSaveTimer = new System.Windows.Forms.Timer();
 
             this.SuspendLayout();
 
+            // Main Tab Control Setup
+            this.mainTabControl.TabPages.Add(this.tabNotepad);
+            this.mainTabControl.TabPages.Add(this.tabBrowser);
+            this.Controls.Add(this.mainTabControl);
+
+            // --- NOTEPAD TAB SETUP ---
             BuildMenus();
 
             this.notepadTextBox.Dock = DockStyle.Fill;
@@ -130,6 +172,25 @@ namespace TransparentNotepad
             this.notepadTextBox.DragEnter += NotepadTextBox_DragEnter;
             this.notepadTextBox.DragDrop += NotepadTextBox_DragDrop;
 
+            this.tabNotepad.Controls.Add(this.notepadTextBox);
+            this.tabNotepad.Controls.Add(this.mainMenuStrip);
+
+            // --- BROWSER MULTI-TAB SETUP ---
+            this.browserTabControl = new TabControl { Dock = DockStyle.Fill };
+            this.addTabButtonPage = new TabPage("+");
+            this.browserTabControl.TabPages.Add(this.addTabButtonPage);
+
+            this.browserTabControl.SelectedIndexChanged += (s, e) =>
+            {
+                if (this.browserTabControl.SelectedTab == this.addTabButtonPage)
+                {
+                    AddNewBrowserTab("https://www.google.com");
+                }
+            };
+
+            this.tabBrowser.Controls.Add(this.browserTabControl);
+
+            // Toast HUD Setup
             this.toastOverlay.AutoSize = true;
             this.toastOverlay.BackColor = Color.FromArgb(220, 230, 230, 230);
             this.toastOverlay.ForeColor = Color.Black;
@@ -144,20 +205,141 @@ namespace TransparentNotepad
                 this.toastTimer.Stop();
             };
 
-            this.Controls.Add(this.toastOverlay);
-            this.Controls.Add(this.notepadTextBox);
-            this.Controls.Add(this.mainMenuStrip);
-            this.MainMenuStrip = this.mainMenuStrip;
+            // Auto-Save Debounce Timer Setup
+            this.autoSaveTimer.Interval = 1000;
+            this.autoSaveTimer.Tick += (s, e) =>
+            {
+                this.autoSaveTimer.Stop();
+                PerformAutoSave();
+            };
 
+            this.Controls.Add(this.toastOverlay);
             this.notepadTextBox.Resize += (s, e) => PositionToastHUD();
 
+            // Window Base Properties
             this.Opacity = Math.Clamp(appConfig.Opacity, 0.15, 1.0);
-            this.ClientSize = new Size(820, 520);
-            this.Text = "Transparent Notepad - Untitled";
+            this.TopMost = appConfig.AlwaysOnTop;
+            this.ClientSize = new Size(1000, 700);
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.Text = "Transparent Notepad & Browser - Untitled";
             this.BackColor = Color.White;
-            
+
             this.ResumeLayout(false);
             this.PerformLayout();
+        }
+
+        private async void InitializeBrowserEnvironmentAsync()
+        {
+            try
+            {
+                string userDataFolder = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "TransparentNotepad",
+                    "WebView2Data"
+                );
+
+                webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
+                AddNewBrowserTab("https://www.google.com");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to initialize WebView2 Environment:\n{ex.Message}", "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void AddNewBrowserTab(string url = "https://www.google.com")
+        {
+            TabPage newTabPage = new TabPage("New Tab");
+
+            // Navigation Bar
+            Panel navPanel = new Panel { Dock = DockStyle.Top, Height = 38, Padding = new Padding(4) };
+            Button btnBack = new Button { Text = "◄", Width = 35, Dock = DockStyle.Left };
+            Button btnForward = new Button { Text = "►", Width = 35, Dock = DockStyle.Left };
+            Button btnRefresh = new Button { Text = "↻", Width = 35, Dock = DockStyle.Left };
+            Button btnGo = new Button { Text = "Go", Width = 50, Dock = DockStyle.Right };
+            Button btnClose = new Button { Text = "✕", Width = 35, Dock = DockStyle.Right };
+            TextBox txtUrl = new TextBox { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 10F) };
+
+            navPanel.Controls.Add(txtUrl);
+            navPanel.Controls.Add(btnGo);
+            navPanel.Controls.Add(btnClose);
+            navPanel.Controls.Add(btnRefresh);
+            navPanel.Controls.Add(btnForward);
+            navPanel.Controls.Add(btnBack);
+
+            // WebView2 Instance per tab
+            WebView2 tabWebView = new WebView2 { Dock = DockStyle.Fill };
+            newTabPage.Controls.Add(tabWebView);
+            newTabPage.Controls.Add(navPanel);
+
+            // Insert tab right before the '+' tab button
+            int insertIndex = browserTabControl.TabPages.Count - 1;
+            if (insertIndex < 0) insertIndex = 0;
+            browserTabControl.TabPages.Insert(insertIndex, newTabPage);
+            browserTabControl.SelectedTab = newTabPage;
+
+            // Initialize individual tab WebView
+            InitTabWebView(tabWebView, txtUrl, newTabPage, url);
+
+            // Event Handlers
+            btnBack.Click += (s, e) => { if (tabWebView.CanGoBack) tabWebView.GoBack(); };
+            btnForward.Click += (s, e) => { if (tabWebView.CanGoForward) tabWebView.GoForward(); };
+            btnRefresh.Click += (s, e) => tabWebView.Reload();
+            btnGo.Click += (s, e) => NavigateTab(tabWebView, txtUrl.Text);
+            txtUrl.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) NavigateTab(tabWebView, txtUrl.Text); };
+
+            btnClose.Click += (s, e) =>
+            {
+                // Explicitly stop navigation and clean up WebView2 core instance
+                if (tabWebView.CoreWebView2 != null)
+                {
+                    tabWebView.CoreWebView2.Stop();
+                }
+
+                tabWebView.Dispose();
+                browserTabControl.TabPages.Remove(newTabPage);
+
+                if (browserTabControl.TabPages.Count == 1)
+                {
+                    AddNewBrowserTab("https://www.google.com");
+                }
+            };
+        }
+
+        private async void InitTabWebView(WebView2 targetWebView, TextBox txtUrl, TabPage tab, string initialUrl)
+        {
+            if (webViewEnvironment == null)
+            {
+                MessageBox.Show("WebView2 environment failed to initialize.", "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            try
+            {
+                await targetWebView.EnsureCoreWebView2Async(webViewEnvironment);
+                targetWebView.CoreWebView2.Navigate(initialUrl);
+
+                targetWebView.SourceChanged += (s, e) => txtUrl.Text = targetWebView.Source.ToString();
+                targetWebView.CoreWebView2.DocumentTitleChanged += (s, e) =>
+                {
+                    string title = targetWebView.CoreWebView2.DocumentTitle;
+                    tab.Text = string.IsNullOrWhiteSpace(title) ? "New Tab" : (title.Length > 15 ? title.Substring(0, 15) + "..." : title);
+                };
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to load tab:\n{ex.Message}", "Browser Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void NavigateTab(WebView2 webView, string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return;
+            if (!url.StartsWith("http://") && !url.StartsWith("https://"))
+            {
+                url = "https://" + url;
+            }
+            webView.CoreWebView2?.Navigate(url);
         }
 
         private void BuildMenus()
@@ -183,8 +365,24 @@ namespace TransparentNotepad
                 opacityMenu.DropDownItems.Add(opacityItem);
             }
 
+            // Always-On-Top Toggle
+            alwaysOnTopMenuItem = new ToolStripMenuItem("Always-On-Top", null, (s, e) => ToggleAlwaysOnTop());
+            alwaysOnTopMenuItem.Checked = appConfig.AlwaysOnTop;
+
+            viewMenu.DropDownItems.Add(opacityMenu);
+            viewMenu.DropDownItems.Add(alwaysOnTopMenuItem);
+
             mainMenuStrip.Items.Add(fileMenu);
-            mainMenuStrip.Items.Add(opacityMenu);
+            mainMenuStrip.Items.Add(viewMenu);
+        }
+
+        private void ToggleAlwaysOnTop()
+        {
+            this.TopMost = !this.TopMost;
+            appConfig.AlwaysOnTop = this.TopMost;
+            alwaysOnTopMenuItem.Checked = this.TopMost;
+            SaveConfig();
+            ShowToast($"Always-On-Top: {(this.TopMost ? "Enabled" : "Disabled")}");
         }
 
         private void ShowToast(string text)
@@ -220,13 +418,44 @@ namespace TransparentNotepad
                 isModified = true;
                 UpdateTitleBar();
             }
+
+            this.autoSaveTimer.Stop();
+            this.autoSaveTimer.Start();
+        }
+
+        private void PerformAutoSave()
+        {
+            try
+            {
+                Directory.CreateDirectory(ConfigDir);
+                File.WriteAllText(AutoSavePath, notepadTextBox.Text);
+            }
+            catch { }
+        }
+
+        private void LoadAutoSaveDraft()
+        {
+            try
+            {
+                if (File.Exists(AutoSavePath))
+                {
+                    string draftContent = File.ReadAllText(AutoSavePath);
+                    if (!string.IsNullOrEmpty(draftContent))
+                    {
+                        notepadTextBox.Text = draftContent;
+                        isModified = false;
+                        UpdateTitleBar();
+                    }
+                }
+            }
+            catch { }
         }
 
         private void UpdateTitleBar()
         {
             string fileName = string.IsNullOrEmpty(currentFilePath) ? "Untitled" : Path.GetFileName(currentFilePath);
             string dirtyMarker = isModified ? "*" : "";
-            this.Text = $"Transparent Notepad - {fileName}{dirtyMarker}";
+            this.Text = $"Transparent Notepad & Browser - {fileName}{dirtyMarker}";
         }
 
         private bool PromptSaveIfModified()
@@ -235,7 +464,7 @@ namespace TransparentNotepad
 
             DialogResult result = MessageBox.Show(
                 "Do you want to save changes to this file?",
-                "Transparent Notepad",
+                "Transparent Notepad & Browser",
                 MessageBoxButtons.YesNoCancel,
                 MessageBoxIcon.Question
             );
@@ -255,6 +484,9 @@ namespace TransparentNotepad
             currentFilePath = null;
             isModified = false;
             UpdateTitleBar();
+
+            try { if (File.Exists(AutoSavePath)) File.Delete(AutoSavePath); } catch { }
+
             ShowToast("New document created");
         }
 
@@ -364,6 +596,12 @@ namespace TransparentNotepad
             }
         }
 
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            UnregisterHotKey(this.Handle, HOTKEY_ID);
+            base.OnHandleDestroyed(e);
+        }
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             if (!PromptSaveIfModified())
@@ -372,6 +610,7 @@ namespace TransparentNotepad
                 return;
             }
 
+            PerformAutoSave();
             UnregisterHotKey(this.Handle, HOTKEY_ID);
             base.OnFormClosing(e);
         }
@@ -512,11 +751,11 @@ namespace TransparentNotepad
             e.Graphics.FillPath(brush, path);
 
             TextRenderer.DrawText(
-                e.Graphics, 
-                this.Text, 
-                this.Font, 
-                this.ClientRectangle, 
-                this.ForeColor, 
+                e.Graphics,
+                this.Text,
+                this.Font,
+                this.ClientRectangle,
+                this.ForeColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter
             );
         }

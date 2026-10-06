@@ -14,6 +14,7 @@ A lightweight, high-contrast C# Windows Forms application that leverages the Win
 
 - .NET 8.0 SDK / .NET 10.0 SDK (or later)
 - Windows 10 / 11
+- Microsoft Edge WebView2 Runtime
 
 ## Build & Run
 
@@ -21,6 +22,12 @@ A lightweight, high-contrast C# Windows Forms application that leverages the Win
 dotnet build
 dotnet run
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+```
+
+### To install WebView
+
+```bash
+dotnet add package Microsoft.Web.WebView2
 ```
 
 **Configuration file location**(this is where opacity is persisted)
