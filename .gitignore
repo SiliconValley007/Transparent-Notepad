@@ -1,17 +1,62 @@
-# Build output directories
-bin/
-obj/
+# Build output
+[Bb]in/
+[Oo]bj/
+publish/
+artifacts/
+out/
+*.nupkg
+*.snupkg
 
-# Visual Studio & IDE cache
+# Compiled binaries & generated files (never commit)
+*.exe
+*.dll
+*.pdb
+*.cache
+*.g.cs
+*.g.i.cs
+*.sourcelink.json
+*.AssemblyInfo.cs
+*.GeneratedMSBuildEditorConfig.editorconfig
+project.assets.json
+*.nuget.dgspec.json
+*.Up2Date
+*.zip
+*.7z
+
+# Tests & coverage
+TestResults/
+*.trx
+coverage/
+*.coverage
+*.coveragexml
+
+# IDE / user files
 .vs/
+.vscode/
+.idea/
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
+*.rsuser
 
-# Executables & Logs
-*.exe
-*.dll
-*.pdb
+# Secrets, local config, logs
 *.pfx
+*.snk
+*.pem
+.env
+.env.*
+config.json
+config.json.bad
+secrets.json
 error_log.txt
+*.log
+Sessions/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Downloaded speech models / local databases
+ggml-*.bin
+*.sqlite

@@ -1,0 +1,66 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-test:
+    name: Build + test (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore TransparentNotepad.sln
+      # CI=true (set by GitHub) turns every compiler/analyzer warning into an error (see Directory.Build.props)
+      - name: Build
+        run: dotnet build TransparentNotepad.sln -c Release --no-restore -warnaserror
+      - name: Test (core + E2E + Windows stealth)
+        run: dotnet test TransparentNotepad.sln -c Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore
+      - name: Vulnerable packages (informational)
+        continue-on-error: true
+        run: dotnet list src/TransparentNotepad/TransparentNotepad.csproj package --vulnerable --include-transitive
+
+  publish-check:
+    name: Publish check (win-x64 only runtimes)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Publish framework-dependent
+        run: dotnet publish src/TransparentNotepad/TransparentNotepad.csproj -c Release -r win-x64 --self-contained false -warnaserror -o publish_test
+      - name: Verify only win-x64 native runtimes shipped
+        shell: pwsh
+        run: |
+          $dirs = if (Test-Path publish_test/runtimes) { (Get-ChildItem publish_test/runtimes -Directory).Name } else { @() }
+          Write-Host "runtimes: $($dirs -join ', ')"
+          $bad = $dirs | Where-Object { $_ -ne 'win-x64' }
+          if ($bad) { throw "Unexpected runtime folders in publish output: $($bad -join ', ')" }

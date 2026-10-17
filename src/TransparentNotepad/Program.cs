@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace TransparentNotepad
@@ -17,6 +18,7 @@ namespace TransparentNotepad
         [STAThread]
         static void Main()
         {
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
@@ -38,11 +40,16 @@ namespace TransparentNotepad
                 }
             };
 
+            TaskScheduler.UnobservedTaskException += (sender, e) => { try { Directory.CreateDirectory(LogDirectory); File.AppendAllText(LogFilePath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] (unobserved task) {e.Exception}\n--------------------------------------------------\n"); } catch { } e.SetObserved(); };
+
+            TransparentNotepad.Logging.Log.Info("app.start", ("version", typeof(MainForm).Assembly.GetName().Version), ("os", Environment.OSVersion.VersionString));
             Application.Run(new MainForm());
+            TransparentNotepad.Logging.Log.Info("app.exit");
         }
 
         private static void LogAndShowException(Exception ex, string userMessage)
         {
+            TransparentNotepad.Logging.Log.Error("app.unhandled_exception", ex, ("message", userMessage));
             try
             {
                 // Ensure directory exists

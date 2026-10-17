@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <Deterministic>true</Deterministic>
+    <WebView2UseWinForms>true</WebView2UseWinForms>
+  </PropertyGroup>
+  <!-- WebView2 package also exposes a WPF assembly we never use; it drags in a second WindowsBase and causes MSB3277. -->
+  <Target BeforeTargets="ResolveAssemblyReferences" Name="StripUnusedWebView2Wpf">
+    <ItemGroup>
+      <Reference Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf'" Remove="@(Reference)" />
+    </ItemGroup>
+  </Target>
+  <!-- GitHub Actions sets CI=true: any compiler/analyzer warning fails the pipeline, local builds stay lenient. -->
+  <PropertyGroup Condition="'$(CI)' == 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <NoWarn>MSB3277</NoWarn>
+
+    <ApplicationIcon>notepad.ico</ApplicationIcon>
+
+    <AssemblyTitle>Transparent Notepad</AssemblyTitle>
+    <AssemblyDescription>A stealthy, transparent note-taking application designed for privacy during screen sharing.</AssemblyDescription>
+    <Company>DebjeetDas</Company>
+    <Product>Transparent Notepad</Product>
+    <Copyright>Copyright © 2026 DebjeetDas</Copyright>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <Version>2.0.0</Version>
+    <Authors>Debjeet</Authors>
+
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
+    <!-- Single File & Native DLL Fix -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- Smallest EXE Size (Requires .NET Desktop Runtime on host PC) -->
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+
+    <RepositoryUrl>https://github.com/SiliconValley007/Transparent-Notepad</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="notepad.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="Whisper.net" Version="1.7.4" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.7.4" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="System.Speech" Version="8.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TransparentNotepad.Tests.Windows" />
+  </ItemGroup>
+
+  <!-- Whisper.net.Runtime ships natives for every OS/arch. Keep only the RID being built/published (win-x64). -->
+  <Target Name="PruneWhisperPublishItems" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(RuntimeIdentifier)' != ''">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="$([System.String]::new('%(ResolvedFileToPublish.RelativePath)').Replace('/', '\').StartsWith('runtimes\')) And !$([System.String]::new('%(ResolvedFileToPublish.RelativePath)').Replace('/', '\').StartsWith('runtimes\$(RuntimeIdentifier)\'))" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PruneUnusedWhisperRuntimes" AfterTargets="Build;Publish" Condition="'$(RuntimeIdentifier)' != ''">
+    <PropertyGroup>
+      <_OutRt>$([System.IO.Path]::GetFullPath('$(OutDir)runtimes'))</_OutRt>
+      <_PubRt>$([System.IO.Path]::GetFullPath('$(PublishDir)runtimes'))</_PubRt>
+      <_OutRtList Condition="Exists('$(_OutRt)')">$([System.IO.Directory]::GetDirectories('$(_OutRt)'))</_OutRtList>
+      <_PubRtList Condition="Exists('$(_PubRt)')">$([System.IO.Directory]::GetDirectories('$(_PubRt)'))</_PubRtList>
+    </PropertyGroup>
+    <ItemGroup>
+      <_OutRtDir Include="$(_OutRtList)" Exclude="$(_OutRt)\$(RuntimeIdentifier)" />
+      <_PubRtDir Include="$(_PubRtList)" Exclude="$(_PubRt)\$(RuntimeIdentifier)" />
+    </ItemGroup>
+    <RemoveDir Directories="@(_OutRtDir);@(_PubRtDir)" />
+  </Target>
+
+</Project>
