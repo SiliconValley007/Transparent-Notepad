@@ -1,12 +1,25 @@
 version: 2
 updates:
-  - package-ecosystem: nuget
+  - package-ecosystem: "nuget"
     directory: "/"
-    schedule: { interval: weekly }
+    schedule:
+      interval: "weekly"
     open-pull-requests-limit: 5
     ignore:
-      - dependency-name: "NAudio"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
-  - package-ecosystem: github-actions
+      # NAudio 2.3+ makes WasapiCapture.BufferDuration read-only
+      - dependency-name: "NAudio*"
+        versions: [">= 2.3.0"]
+      # Keep System.* packages aligned with target framework net8.0-windows
+      - dependency-name: "System.Speech"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.Security.Cryptography.ProtectedData"
+        update-types: ["version-update:semver-major"]
+      # Keep Whisper.net & Runtime locked to tested 1.7.4 native binaries
+      - dependency-name: "Whisper.net*"
+        versions: [">= 1.8.0"]
+
+  - package-ecosystem: "github-actions"
     directory: "/"
-    schedule: { interval: weekly }
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
